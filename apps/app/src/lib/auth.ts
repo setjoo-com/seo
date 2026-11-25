@@ -19,9 +19,10 @@ export const getAuthOptions = () => api<AuthOptions>("/auth-options");
 
 // Starts single sign-on: the API answers with the provider's authorize URL, and the browser goes there.
 export async function signInWithSso(providerId: string, next: string | null) {
-  const { url } = await api<{ url: string }>("/auth/sign-in/oauth2", {
+  // better-auth 1.7 serves generic OAuth providers through the core social sign-in route.
+  const { url } = await api<{ url: string }>("/auth/sign-in/social", {
     method: "POST",
-    body: { providerId, callbackURL: next ?? "/projects", newUserCallbackURL: "/welcome", errorCallbackURL: "/sign-in" },
+    body: { provider: providerId, callbackURL: next ?? "/projects", newUserCallbackURL: "/welcome", errorCallbackURL: "/sign-in", disableRedirect: true },
   });
   window.location.assign(url);
 }
