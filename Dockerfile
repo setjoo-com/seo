@@ -7,7 +7,8 @@
 
 FROM node:26-bookworm-slim AS base
 ENV PNPM_HOME=/pnpm PATH=/pnpm:$PATH COREPACK_ENABLE_DOWNLOAD_PROMPT=0 NEXT_TELEMETRY_DISABLED=1
-RUN corepack enable && corepack prepare pnpm@10.30.3 --activate
+# Node 25+ no longer ships corepack, so install pnpm directly.
+RUN npm install -g pnpm@10.30.3 && pnpm --version
 WORKDIR /openseo
 
 # ── Dependencies, cached until a package.json or the lockfile changes ────────
