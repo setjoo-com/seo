@@ -32,6 +32,12 @@ describe("sessions", () => {
     expect(res.body.error?.code).toBe("forbidden_origin");
   });
 
+  it("reports the sign-in options: no single sign-on and open email sign-up by default", async () => {
+    const app = await getApp();
+    const res = await app.inject({ method: "GET", url: "/api/auth-options" });
+    expect(res.json()).toEqual({ ok: true, data: { sso: null, emailSignUp: true } });
+  });
+
   it("serves health and a JSON 404 for unknown routes", async () => {
     const app = await getApp();
     expect((await app.inject({ method: "GET", url: "/health" })).json()).toEqual({ ok: true });

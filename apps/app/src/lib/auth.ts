@@ -13,4 +13,17 @@ export const signIn = (email: string, password: string) =>
 export const signUp = (name: string, email: string, password: string) =>
   api("/auth/sign-up/email", { method: "POST", body: { name, email, password } });
 
+export type AuthOptions = { sso: { providerId: string; name: string } | null; emailSignUp: boolean };
+
+export const getAuthOptions = () => api<AuthOptions>("/auth-options");
+
+// Starts single sign-on: the API answers with the provider's authorize URL, and the browser goes there.
+export async function signInWithSso(providerId: string, next: string | null) {
+  const { url } = await api<{ url: string }>("/auth/sign-in/oauth2", {
+    method: "POST",
+    body: { providerId, callbackURL: next ?? "/projects", newUserCallbackURL: "/welcome", errorCallbackURL: "/sign-in" },
+  });
+  window.location.assign(url);
+}
+
 export const signOut = () => api("/auth/sign-out", { method: "POST", body: {} });

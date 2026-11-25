@@ -1,7 +1,7 @@
 import cors from "@fastify/cors";
 import Fastify, { type FastifyInstance } from "fastify";
 import { env } from "./env";
-import { auth } from "./lib/auth";
+import { auth, emailSignUpEnabled, SETJOO_PROVIDER_ID, ssoEnabled } from "./lib/auth";
 import { toHeaders } from "./lib/context";
 import { AppError, isInvalidInput } from "./lib/errors";
 import { toAppError } from "./lib/yep";
@@ -72,6 +72,12 @@ export async function buildApp(): Promise<FastifyInstance> {
   );
 
   app.get("/health", async () => ({ ok: true }));
+
+  // Which ways in the sign-in and sign-up pages should offer.
+  app.get("/api/auth-options", async () => ({
+    ok: true,
+    data: { sso: ssoEnabled ? { providerId: SETJOO_PROVIDER_ID, name: "Setjoo" } : null, emailSignUp: emailSignUpEnabled },
+  }));
 
   app.route({
     method: ["GET", "POST"],

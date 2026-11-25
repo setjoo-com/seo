@@ -56,6 +56,16 @@ const schema = z.object({
   POSTHOG_KEY: z.string().optional(),
   POSTHOG_HOST: z.string().url().default("https://us.i.posthog.com"),
 
+  // Optional: "Continue with Setjoo" single sign-on. The issuer serves OIDC discovery, and the
+  // client is a public one (PKCE, no secret) whose redirect URI is ${APP_URL}/api/auth/oauth2/callback/setjoo.
+  SETJOO_SSO_ISSUER: z.string().url().optional(),
+  SETJOO_SSO_CLIENT_ID: z.string().min(1).default("setjoo-seo"),
+  // "false" turns off email-and-password sign-up; existing accounts can still sign in.
+  AUTH_EMAIL_SIGNUP: z.enum(["true", "false"]).default("true"),
+  // Comma lists. When either is set, only these emails, or emails at these domains, may create an account.
+  AUTH_ALLOWED_EMAILS: z.string().optional(),
+  AUTH_ALLOWED_EMAIL_DOMAINS: z.string().optional(),
+
 });
 
 const parsed = schema.safeParse(process.env);
