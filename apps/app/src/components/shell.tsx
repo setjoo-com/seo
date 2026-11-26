@@ -1,7 +1,7 @@
 "use client";
 
 import { useQueryClient } from "@tanstack/react-query";
-import { Activity, BarChart3, Bot, ChevronLeft, ClipboardCheck, FolderKanban, Gauge, Globe, KeyRound, LayoutDashboard, Link2, LogOut, MapPin, Menu, Network, ScanSearch, Search, Settings, SlidersHorizontal, Sparkles, Star, Swords, TrendingUp, Wrench, X } from "lucide-react";
+import { Activity, BarChart3, Bot, ChevronLeft, ClipboardCheck, FilePen, FolderKanban, Gauge, Globe, KeyRound, LayoutDashboard, Link2, LogOut, MapPin, Menu, Network, ScanSearch, Search, Settings, SlidersHorizontal, Sparkles, Star, Swords, TrendingUp, Wrench, X } from "lucide-react";
 import Link from "next/link";
 import { useParams, usePathname, useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
@@ -22,6 +22,7 @@ const projectNav = [
   { href: "/keywords", label: "Keyword research", icon: Search },
   { href: "/saved", label: "Saved keywords", icon: Star },
   { href: "/difficulty", label: "Keyword difficulty", icon: Gauge },
+  { href: "/content", label: "Content", icon: FilePen },
   { href: "/rank", label: "Rank tracking", icon: TrendingUp },
   { href: "/serp-features", label: "AI Overviews", icon: Sparkles },
   { href: "/search", label: "Search performance", icon: BarChart3 },
