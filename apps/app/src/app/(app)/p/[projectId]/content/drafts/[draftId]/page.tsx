@@ -6,6 +6,7 @@ import { ChevronLeft, Save, Trash2 } from "lucide-react";
 import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
 import { useDeferredValue, useEffect, useMemo, useState } from "react";
+import { useLeaveGuard } from "@/components/content/leave-guard";
 import { ScorePanel } from "@/components/content/score";
 import type { Draft } from "@/components/content/types";
 import { ConfirmDialog } from "@/components/tracking/kit";
@@ -43,7 +44,10 @@ function Editor({ projectId, draft }: { projectId: string; draft: Draft }) {
     },
   });
 
-  // Ctrl/Cmd+S saves; leaving with unsaved changes asks first.
+  // Leaving with unsaved changes asks first, by link inside the app or by closing the tab.
+  const guard = useLeaveGuard(dirty && !remove.isPending && !remove.isSuccess);
+
+  // Ctrl/Cmd+S saves.
   useEffect(() => {
     const onKey = (event: KeyboardEvent) => {
       if ((event.metaKey || event.ctrlKey) && event.key === "s") {
@@ -51,15 +55,8 @@ function Editor({ projectId, draft }: { projectId: string; draft: Draft }) {
         if (dirty && !save.isPending) save.mutate();
       }
     };
-    const onLeave = (event: BeforeUnloadEvent) => {
-      if (dirty) event.preventDefault();
-    };
     window.addEventListener("keydown", onKey);
-    window.addEventListener("beforeunload", onLeave);
-    return () => {
-      window.removeEventListener("keydown", onKey);
-      window.removeEventListener("beforeunload", onLeave);
-    };
+    return () => window.removeEventListener("keydown", onKey);
   }, [dirty, save]);
 
   return (
@@ -107,6 +104,9 @@ function Editor({ projectId, draft }: { projectId: string; draft: Draft }) {
         </div>
       </div>
 
+      <ConfirmDialog open={guard.pending !== null} onClose={guard.stay} onConfirm={guard.leave} title="Leave without saving?" confirmLabel="Leave" danger>
+        <p>Your changes to this draft are not saved yet. Stay and press Save to keep them.</p>
+      </ConfirmDialog>
       <ConfirmDialog
         open={confirming}
         onClose={() => setConfirming(false)}
