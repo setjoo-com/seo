@@ -105,3 +105,18 @@ export function serpResultHost(result: SerpResultLike): string | null {
 export function serpResultPageUrl(result: SerpResultLike): string | null {
   return result.url && !isGoogleRedirect(result.url) ? result.url : null;
 }
+
+/** Questions from People Also Ask blocks, read defensively: YepAPI types `data` loosely. */
+export function peopleAlsoAsk(results: readonly { type?: string; data?: unknown }[] | null | undefined): string[] {
+  const found: string[] = [];
+  for (const result of results ?? []) {
+    if (!result || result.type !== "peopleAlsoAsk") continue;
+    const items = result.data && typeof result.data === "object" ? (result.data as { items?: unknown }).items : null;
+    if (!Array.isArray(items)) continue;
+    for (const item of items) {
+      const title = item && typeof item === "object" ? (item as { title?: unknown }).title : null;
+      if (typeof title === "string" && title.trim()) found.push(title.trim());
+    }
+  }
+  return [...new Set(found)];
+}

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { isGoogleRedirect, serpResultHost, serpResultPageUrl } from "./serp-site";
+import { isGoogleRedirect, peopleAlsoAsk, serpResultHost, serpResultPageUrl } from "./serp-site";
 
 const goto = "https://google.com/goto?url=CAESmgEB6zswFVV8XyT5";
 
@@ -29,5 +29,20 @@ describe("redirect links", () => {
     expect(isGoogleRedirect("https://google.com/search?q=x")).toBe(false);
     expect(serpResultPageUrl({ url: goto })).toBeNull();
     expect(serpResultPageUrl({ url: "https://acme.com/" })).toBe("https://acme.com/");
+  });
+});
+
+describe("peopleAlsoAsk", () => {
+  it("reads questions defensively from any shape", () => {
+    expect(
+      peopleAlsoAsk([
+        { type: "organic", data: { items: [{ title: "Not this" }] } },
+        { type: "peopleAlsoAsk", data: { items: [{ title: " What is a boot? " }, { title: 3 }, null, "text", { title: "What is a boot?" }] } },
+        { type: "peopleAlsoAsk", data: { items: "nope" } },
+        { type: "peopleAlsoAsk", data: null },
+        { type: "peopleAlsoAsk" },
+      ]),
+    ).toEqual(["What is a boot?"]);
+    expect(peopleAlsoAsk(undefined)).toEqual([]);
   });
 });

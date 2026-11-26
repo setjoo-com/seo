@@ -1,6 +1,6 @@
 "use client";
 
-import { serpResultPageUrl } from "@openseo/shared";
+import { peopleAlsoAsk, serpResultPageUrl } from "@openseo/shared";
 import { ArrowRight } from "lucide-react";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
@@ -12,7 +12,6 @@ import { SearchBar, useChangeMarket, useMarket, useToolNav } from "@/components/
 import {
   authorityInput,
   featureLabel,
-  peopleAlsoAsk,
   RatingRing,
   SerpOverview,
   serpInput,

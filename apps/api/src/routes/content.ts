@@ -1,4 +1,4 @@
-import { cleanText, cleanUrl, zKeyword } from "@openseo/shared";
+import { cleanText, cleanUrl, peopleAlsoAsk, zKeyword } from "@openseo/shared";
 import { and, desc, eq, sql } from "drizzle-orm";
 import type { FastifyInstance } from "fastify";
 import { z } from "zod";
@@ -60,7 +60,6 @@ const writerInput = z.object({
 // A ceiling that does not parse must be refused, not read as "no ceiling".
 const costQuery = z.object({ dryRun: z.string().optional().transform((v) => v === "1"), maxCostUsd: z.coerce.number().positive().finite().optional() });
 
-type SerpData = { results: { type: string; url?: string; data?: { items?: { title?: string }[] } | null }[] };
 type P = { Params: { projectId: string }; Querystring: Record<string, string | undefined> };
 type BriefParams = { Params: { projectId: string; briefId: string }; Querystring: Record<string, string | undefined> };
 type DraftParams = { Params: { projectId: string; draftId: string } };
@@ -150,13 +149,12 @@ export async function contentRoutes(app: FastifyInstance) {
       if ("dryRun" in lookup) return { ok: true, data: { estimate: lookup.estimate, dryRun: true } };
       estimate = lookup.estimate;
       costUsd = lookup.costUsd;
-      const results = (lookup.data as SerpData).results ?? [];
-      urls = [...new Set(results.filter((r) => r.type === "organic" && r.url).map((r) => r.url as string))].slice(0, MAX_BRIEF_URLS);
-      serpQuestions = results
-        .filter((r) => r.type === "peopleAlsoAsk")
-        .flatMap((r) => r.data?.items ?? [])
-        .map((item) => item.title?.trim() ?? "")
-        .filter(Boolean);
+      // Read defensively: the lookup is already paid, so a surprising shape must not end in a 500.
+      const data = lookup.data as { results?: unknown } | null;
+      const results = (Array.isArray(data?.results) ? data.results : []) as { type?: string; url?: unknown; data?: unknown }[];
+      const organic = results.filter((r) => r?.type === "organic" && typeof r.url === "string" && r.url).map((r) => r.url as string);
+      urls = [...new Set(organic)].slice(0, MAX_BRIEF_URLS);
+      serpQuestions = peopleAlsoAsk(results);
       if (!urls.length) throw new AppError(404, "no_results", `Google shows no organic results for "${input.keyword}" in ${project.locationName}`);
     }
 

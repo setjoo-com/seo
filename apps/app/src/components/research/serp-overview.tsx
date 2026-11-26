@@ -7,7 +7,7 @@ import { cx } from "@/components/ui";
 import { compact, num } from "@/lib/api";
 import type { LookupQuery } from "@/lib/lookup";
 import { type Market, toolLinks } from "@/lib/scope";
-import { serpResultHost, serpResultPageUrl } from "@openseo/shared";
+import { peopleAlsoAsk, serpResultHost, serpResultPageUrl } from "@openseo/shared";
 import { safeHref } from "@/lib/url";
 import { ExportButton } from "./lookup-ui";
 import type { SerpData, SerpInput, SerpResult, UrlMetricsData, UrlMetricsRow } from "./types";
@@ -45,21 +45,6 @@ const FEATURE_LABELS: Record<string, string> = {
 };
 export const featureLabel = (type: string) =>
   FEATURE_LABELS[type] ?? type.replace(/([a-z])([A-Z])/g, "$1 $2").replace(/[_-]+/g, " ").replace(/^./, (c) => c.toUpperCase());
-
-/** Questions from People Also Ask blocks, read defensively: `data` is loosely typed. */
-export function peopleAlsoAsk(results: SerpResult[]) {
-  const found: string[] = [];
-  for (const result of results) {
-    if (result.type !== "peopleAlsoAsk") continue;
-    const items = result.data?.items;
-    if (!Array.isArray(items)) continue;
-    for (const item of items) {
-      const title = item && typeof item === "object" ? (item as { title?: unknown }).title : null;
-      if (typeof title === "string" && title) found.push(title);
-    }
-  }
-  return [...new Set(found)];
-}
 
 /** Google autocomplete suggestions, in Google's order. YepAPI puts the text in data.suggestion. */
 export function suggestionsOf(data: SerpData | undefined) {
