@@ -23,7 +23,7 @@ import {
 } from "drizzle-orm/pg-core";
 
 import { createdAt, updatedAt } from "./columns";
-import type { ContentBrief } from "@openseo/shared";
+import type { BriefSource, ContentBrief } from "@openseo/shared";
 import type { GoogleProvider } from "./core-schema";
 
 export const apiCache = pgTable(
@@ -668,9 +668,6 @@ export const indexnowSubmissions = pgTable(
 );
 
 // ── Content ─────────────────────────────────────────────────────────────────
-
-/** "urls": pasted by the user (free). "serp": Google's top 10 for the keyword (one paid SERP lookup). */
-export type BriefSource = "urls" | "serp";
 
 /** A content brief: competitor pages for a keyword, read in the background and summarised. */
 export const contentBriefs = pgTable(

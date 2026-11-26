@@ -1,7 +1,5 @@
-import type { ContentBrief } from "@openseo/shared";
+import type { BriefSource, ContentBrief } from "@openseo/shared";
 import type { RunStatus } from "@/components/tracking/kit";
-
-export type BriefSource = "urls" | "serp";
 
 export type BriefRow = {
   id: string;

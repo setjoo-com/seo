@@ -1,14 +1,13 @@
-import { createSiteFetcher, extractContent, type SiteFetcherOptions } from "@openseo/crawler";
-import { buildBrief, CURATED_MODELS, MODEL_CATALOG, scoreContent, type ContentBrief, type FailedPage, type PageInput } from "@openseo/shared";
+import { createSiteFetcher, extractContent } from "@openseo/crawler";
+import { buildBrief, CURATED_MODELS, MODEL_CATALOG, scoreContent, type ContentBrief, type FailedPage, type PageInput, type WriterMode } from "@openseo/shared";
 import { and, eq, inArray } from "drizzle-orm";
 import { dataDb, schema } from "../db";
 import { errorMessage, getYep, withUpstreamRetry } from "../lib/yep";
 import { mapLimit } from "../lib/pool";
+import type { NetOptions } from "./indexing";
 
-export type NetOptions = Pick<SiteFetcherOptions, "allowPrivateNetwork" | "allowedPorts" | "fetch">;
 type Brief = typeof schema.contentBriefs.$inferSelect;
 
-export const MAX_BRIEF_URLS = 10;
 /** Per page, and few pages at once: ten slow sites finish in well under a minute. */
 const PAGE_TIMEOUT_MS = 15_000;
 const PAGE_CONCURRENCY = 4;
@@ -81,9 +80,7 @@ export function scoreDraft(brief: Pick<Brief, "keyword" | "brief">, draft: { tit
 
 // ── AI writer ───────────────────────────────────────────────────────────────
 
-export type WriterMode = "draft" | "outline";
 export const WRITER_MODELS = CURATED_MODELS.map((m) => m.id);
-export const DEFAULT_WRITER_MODEL = "anthropic/claude-sonnet-5";
 
 /** Output tokens allowed: enough for the top of the brief's length range, about 1.4 tokens a word. */
 function maxTokensFor(brief: ContentBrief | null, mode: WriterMode): number {

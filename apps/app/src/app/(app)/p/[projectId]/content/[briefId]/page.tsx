@@ -1,6 +1,6 @@
 "use client";
 
-import { CURATED_MODELS, type ContentBrief } from "@openseo/shared";
+import { CURATED_MODELS, type ContentBrief, DEFAULT_WRITER_MODEL, type WriterMode } from "@openseo/shared";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { ChevronLeft, Plus, Sparkles, Trash2 } from "lucide-react";
 import Link from "next/link";
@@ -11,8 +11,6 @@ import { ConfirmDialog, ExtLink, isActive, Note, Segmented, StatusBadge } from "
 import { Badge, Button, Card, CardHeader, EmptyState, ErrorNote, Field, PageHeader, Select, Spinner, Stat, Table } from "@/components/ui";
 import { api, dateTime, num, usd } from "@/lib/api";
 import { useMe } from "@/lib/hooks";
-
-const DEFAULT_MODEL = "anthropic/claude-sonnet-5";
 
 function Outline({ brief }: { brief: ContentBrief }) {
   return (
@@ -140,8 +138,8 @@ function Writer({ projectId, brief }: { projectId: string; brief: BriefDetail })
   const queryClient = useQueryClient();
   const me = useMe();
   const hasKey = Boolean(me.data?.settings.hasYepapiKey);
-  const [mode, setMode] = useState<"draft" | "outline">("draft");
-  const [model, setModel] = useState(DEFAULT_MODEL);
+  const [mode, setMode] = useState<WriterMode>("draft");
+  const [model, setModel] = useState(DEFAULT_WRITER_MODEL);
   const path = `/projects/${projectId}/content/briefs/${brief.id}/write`;
   const estimate = useQuery({
     queryKey: ["content-writer-estimate", brief.id, mode, model],

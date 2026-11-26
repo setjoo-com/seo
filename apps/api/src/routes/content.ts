@@ -1,4 +1,4 @@
-import { cleanText, cleanUrl, peopleAlsoAsk, zKeyword } from "@openseo/shared";
+import { BRIEF_MAX_URLS, cleanText, cleanUrl, DEFAULT_WRITER_MODEL, peopleAlsoAsk, zKeyword } from "@openseo/shared";
 import { and, desc, eq, sql } from "drizzle-orm";
 import type { FastifyInstance } from "fastify";
 import { z } from "zod";
@@ -7,15 +7,7 @@ import { dispatch } from "../jobs/dispatch";
 import { requireProject, requireUser } from "../lib/context";
 import { AppError, conflict, notFound, parse, uuidParam } from "../lib/errors";
 import { runLookup } from "../services/run-lookup";
-import {
-  DEFAULT_WRITER_MODEL,
-  estimateWriter,
-  failBrief,
-  MAX_BRIEF_URLS,
-  scoreDraft,
-  WRITER_MODELS,
-  writeDraft,
-} from "../services/content";
+import { estimateWriter, failBrief, scoreDraft, WRITER_MODELS, writeDraft } from "../services/content";
 
 /** A plain http(s) address, for hosts cleanUrl does not take (an IP address, a port). */
 function httpUrl(value: string): string | null {
@@ -43,7 +35,7 @@ const pageUrl = z
   });
 
 const briefInput = z.discriminatedUnion("source", [
-  z.object({ source: z.literal("urls"), keyword: zKeyword(), urls: z.array(pageUrl).min(1).max(MAX_BRIEF_URLS) }),
+  z.object({ source: z.literal("urls"), keyword: zKeyword(), urls: z.array(pageUrl).min(1).max(BRIEF_MAX_URLS) }),
   z.object({ source: z.literal("serp"), keyword: zKeyword() }),
 ]);
 
@@ -153,7 +145,7 @@ export async function contentRoutes(app: FastifyInstance) {
       const data = lookup.data as { results?: unknown } | null;
       const results = (Array.isArray(data?.results) ? data.results : []) as { type?: string; url?: unknown; data?: unknown }[];
       const organic = results.filter((r) => r?.type === "organic" && typeof r.url === "string" && r.url).map((r) => r.url as string);
-      urls = [...new Set(organic)].slice(0, MAX_BRIEF_URLS);
+      urls = [...new Set(organic)].slice(0, BRIEF_MAX_URLS);
       serpQuestions = peopleAlsoAsk(results);
       if (!urls.length) throw new AppError(404, "no_results", `Google shows no organic results for "${input.keyword}" in ${project.locationName}`);
     }

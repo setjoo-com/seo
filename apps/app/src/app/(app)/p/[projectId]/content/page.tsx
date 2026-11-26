@@ -5,14 +5,13 @@ import { Plus } from "lucide-react";
 import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
 import { useState } from "react";
-import { type BriefDetail, type BriefRow, type BriefSource, scoreTone } from "@/components/content/types";
+import { BRIEF_MAX_URLS, type BriefSource } from "@openseo/shared";
+import { type BriefDetail, type BriefRow, scoreTone } from "@/components/content/types";
 import { isActive, lines, Note, Segmented, StatusBadge } from "@/components/tracking/kit";
 import { Badge, Button, Card, CardHeader, EmptyState, ErrorNote, Field, Input, PageHeader, Spinner, Table, Textarea } from "@/components/ui";
 import { api, dateTime, num, usd } from "@/lib/api";
 import { type Project, useMe, useProject } from "@/lib/hooks";
 import type { Estimate } from "@/lib/lookup";
-
-const MAX_URLS = 10;
 
 function NewBrief({ project, onDone }: { project: Project; onDone: () => void }) {
   const router = useRouter();
@@ -23,7 +22,7 @@ function NewBrief({ project, onDone }: { project: Project; onDone: () => void })
   const [source, setSource] = useState<BriefSource>("urls");
   const [text, setText] = useState("");
   const urls = lines(text);
-  const tooMany = urls.length > MAX_URLS;
+  const tooMany = urls.length > BRIEF_MAX_URLS;
   const ready = keyword.trim().length > 0 && (source === "serp" ? hasKey : urls.length > 0 && !tooMany);
 
   // The SERP lookup's price does not depend on the keyword, so it is asked once.
@@ -72,13 +71,13 @@ function NewBrief({ project, onDone }: { project: Project; onDone: () => void })
             ]}
           />
           {source === "urls" ? (
-            <Field label="Competitor URLs" hint={`One per line, up to ${MAX_URLS}. Pages that cannot be read are listed and skipped.`}>
+            <Field label="Competitor URLs" hint={`One per line, up to ${BRIEF_MAX_URLS}. Pages that cannot be read are listed and skipped.`}>
               <Textarea value={text} onChange={(event) => setText(event.target.value)} rows={6} className="font-mono text-[13px]" placeholder={"https://example.com/best-winter-boots\nhttps://another.com/boots-guide"} />
-              {tooMany && <span className="mt-1.5 block text-xs text-neg">{urls.length} URLs entered; a brief reads up to {MAX_URLS}.</span>}
+              {tooMany && <span className="mt-1.5 block text-xs text-neg">{urls.length} URLs entered; a brief reads up to {BRIEF_MAX_URLS}.</span>}
             </Field>
           ) : hasKey ? (
             <p className="text-[13px] text-muted">
-              Looks up Google&apos;s first page for the keyword in {project.locationName} and reads the top {MAX_URLS} results.{" "}
+              Looks up Google&apos;s first page for the keyword in {project.locationName} and reads the top {BRIEF_MAX_URLS} results.{" "}
               {estimate.data ? (
                 <>
                   Costs <span className="font-mono text-ink">{usd(estimate.data.max ?? estimate.data.min)}</span> from your YepAPI balance, nothing if the same search ran in the last hour.
