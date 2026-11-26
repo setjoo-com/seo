@@ -156,6 +156,11 @@ export function handle(path: string, body: any): unknown {
       if (prompt.includes("Write ") && prompt.includes("questions")) {
         return { model: body.model, message: { role: "assistant", content: JSON.stringify(["What is the best plumbing software for a small team?", "How do I choose a scheduling tool for plumbers?", "Which tools help plumbers send invoices faster?"]) }, usage: { promptTokens: 80, completionTokens: 60, totalTokens: 140 }, costUsd: 0.01 };
       }
+      if (String(body.messages?.[0]?.content ?? "").includes("SEO content writer")) {
+        const keyword = /Target keyword: (.+)/.exec(prompt)?.[1] ?? "the topic";
+        const content = `# A guide to ${keyword}\n\nThis guide covers ${keyword} from the start.\n\n## Getting started\n\nPick what you need first.\n\n## Common questions\n\nMost people ask about price and fit.`;
+        return { model: body.model, message: { role: "assistant", content }, usage: { promptTokens: 400, completionTokens: 120, totalTokens: 520 }, costUsd: 0.034 };
+      }
       const h = hash(`${prompt}|${body.model}`);
       const names = ["Acme", "Globex", "Initech", "Hooli"];
       const picked = names.filter((_, i) => (h >> i) % 2 === 0);

@@ -10,6 +10,7 @@ import { registerRequestAnalytics } from "./lib/request-analytics";
 import { accountRoutes } from "./routes/account";
 import { aiRoutes } from "./routes/ai";
 import { auditRoutes } from "./routes/audit";
+import { contentRoutes } from "./routes/content";
 import { googleRoutes } from "./routes/google";
 import { indexingRoutes } from "./routes/indexing";
 import { oauthPublicRoutes, oauthSessionRoutes } from "./routes/oauth";
@@ -122,6 +123,7 @@ export async function buildApp(): Promise<FastifyInstance> {
       await api.register(localRoutes);
       await api.register(googleRoutes);
       await api.register(indexingRoutes);
+      await api.register(contentRoutes);
       await api.register(oauthSessionRoutes);
     },
     { prefix: "/api" },

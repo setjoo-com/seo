@@ -23,6 +23,7 @@ import {
 } from "drizzle-orm/pg-core";
 
 import { createdAt, updatedAt } from "./columns";
+import type { ContentBrief } from "@openseo/shared";
 import type { GoogleProvider } from "./core-schema";
 
 export const apiCache = pgTable(
@@ -664,6 +665,62 @@ export const indexnowSubmissions = pgTable(
     createdAt: createdAt(),
   },
   (t) => [index("indexnow_submissions_project_idx").on(t.projectId, t.createdAt)],
+);
+
+// ── Content ─────────────────────────────────────────────────────────────────
+
+/** "urls": pasted by the user (free). "serp": Google's top 10 for the keyword (one paid SERP lookup). */
+export type BriefSource = "urls" | "serp";
+
+/** A content brief: competitor pages for a keyword, read in the background and summarised. */
+export const contentBriefs = pgTable(
+  "content_briefs",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    projectId: uuid("project_id")
+      .notNull()
+      .references(() => projects.id, { onDelete: "cascade" }),
+    keyword: text("keyword").notNull(),
+    source: text("source").$type<BriefSource>().notNull(),
+    // The pages to read, in Google order for a "serp" brief.
+    urls: text("urls").array().notNull(),
+    // People Also Ask questions from the SERP, added to the brief's questions.
+    serpQuestions: text("serp_questions").array().notNull().default(sql`'{}'::text[]`),
+    status: text("status").$type<RunStatus>().notNull().default("queued"),
+    brief: jsonb("brief").$type<ContentBrief>(),
+    // What the SERP lookup cost (0 when pasted or served from the cache).
+    costUsd: doublePrecision("cost_usd").notNull().default(0),
+    error: text("error"),
+    createdAt: createdAt(),
+    heartbeatAt: timestamp("heartbeat_at", { withTimezone: true }),
+    startedAt: timestamp("started_at", { withTimezone: true }),
+    finishedAt: timestamp("finished_at", { withTimezone: true }),
+  },
+  (t) => [index("content_briefs_project_idx").on(t.projectId, t.createdAt)],
+);
+
+/** A Markdown draft written against a brief. The score is the shared scoreContent at the last save. */
+export const contentDrafts = pgTable(
+  "content_drafts",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    projectId: uuid("project_id")
+      .notNull()
+      .references(() => projects.id, { onDelete: "cascade" }),
+    briefId: uuid("brief_id")
+      .notNull()
+      .references(() => contentBriefs.id, { onDelete: "cascade" }),
+    title: text("title").notNull().default(""),
+    body: text("body").notNull().default(""),
+    score: integer("score").notNull().default(0),
+    wordCount: integer("word_count").notNull().default(0),
+    // Set when the AI writer wrote it: the model and what the call cost.
+    aiModel: text("ai_model"),
+    aiCostUsd: doublePrecision("ai_cost_usd"),
+    createdAt: createdAt(),
+    updatedAt: updatedAt(),
+  },
+  (t) => [index("content_drafts_brief_idx").on(t.briefId, t.updatedAt), index("content_drafts_project_idx").on(t.projectId)],
 );
 
 // ── Relations ───────────────────────────────────────────────────────────────

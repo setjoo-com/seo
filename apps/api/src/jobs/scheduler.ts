@@ -133,14 +133,14 @@ defineJob("scheduler.tick", 1, async (_data, log) => {
 /**
  * Every 15 minutes: drop expired cache rows and fail runs a crashed worker abandoned, so they
  * stop blocking their tracker or project. A running run is abandoned when its heartbeat (touched
- * on every check, answer, point or 10 crawled pages) has been quiet for 30 minutes; a queued
+ * on every check, answer, point, brief page or 10 crawled pages) has been quiet for 30 minutes; a queued
  * one when no worker has picked it up in 6 hours. Long but live runs are left alone.
  */
 defineJob("maintenance.cleanup", 1, async () => {
   await dataDb.delete(schema.apiCache).where(lt(schema.apiCache.expiresAt, new Date()));
   await cleanupOAuth();
   const abandoned = { status: "failed" as const, error: "Interrupted before it finished", finishedAt: new Date() };
-  const tables = [schema.rankRuns, schema.aiRuns, schema.audits, schema.geoGrids] as const;
+  const tables = [schema.rankRuns, schema.aiRuns, schema.audits, schema.geoGrids, schema.contentBriefs] as const;
   for (const table of tables) {
     await dataDb
       .update(table)
