@@ -4,6 +4,13 @@
  * score on screen is the score that is saved.
  */
 
+/** Where a brief's pages come from: pasted by the user (free), or Google's top results (one paid SERP lookup). */
+export type BriefSource = "urls" | "serp";
+/** Pages one brief reads at most. */
+export const BRIEF_MAX_URLS = 10;
+export type WriterMode = "draft" | "outline";
+export const DEFAULT_WRITER_MODEL = "anthropic/claude-sonnet-5";
+
 export type OutlineHeading = { level: number; text: string };
 export type TermCount = { term: string; count: number };
 
@@ -26,12 +33,17 @@ export type CompetitorPage = {
 export type PageInput = {
   url: string;
   position?: number | null;
+  /** Place in the list the pages were given in; orders pages that have no Google position. */
+  order?: number;
   title: string | null;
   headings: OutlineHeading[];
   text: string;
   wordCount: number;
 };
-export type FailedPage = { url: string; position?: number | null; error: string };
+export type FailedPage = { url: string; position?: number | null; order?: number; error: string };
+
+/** A question to answer: from Google's People Also Ask, competitors' headings (`pages`), or both. */
+export type BriefQuestion = { text: string; pages: number; google: boolean };
 
 /** A term competitors use, and how often a page that uses it does (lower and upper quartile). */
 export type BriefTerm = { term: string; pages: number; min: number; max: number };
@@ -43,8 +55,8 @@ export type ContentBrief = {
   /** h2 and h3 headings competitors share, most shared first. */
   headings: { text: string; level: number; pages: number }[];
   terms: BriefTerm[];
-  /** Questions from competitors' headings; `pages` 0 marks one from Google's People Also Ask. */
-  questions: { text: string; pages: number }[];
+  /** Google's People Also Ask questions first (`google`), then competitors' question headings. */
+  questions: BriefQuestion[];
   competitors: CompetitorPage[];
 };
 
@@ -134,6 +146,9 @@ const round50 = (n: number) => Math.max(50, Math.round(n / 50) * 50);
 const THIN_PAGE = 100;
 const MAX_TERMS = 25;
 const MAX_PHRASES = 15;
+const MAX_QUESTIONS = 30;
+/** Google's questions are what searchers ask; up to this many keep a place ahead of heading questions. */
+const MAX_GOOGLE_QUESTIONS = 10;
 
 /**
  * Builds a brief from the competitor pages that could be read. Failed pages are listed with
@@ -196,19 +211,24 @@ export function buildBrief(keyword: string, pages: PageInput[], failed: FailedPa
     .map((g) => ({ text: g.text, level: g.level, pages: g.urls.size }))
     .sort((a, b) => b.pages - a.pages || a.level - b.level)
     .slice(0, 40);
-  const questions = [...questionGroups.values()].map((g) => ({ text: g.text, pages: g.urls.size })).sort((a, b) => b.pages - a.pages);
+  const google = new Map<string, BriefQuestion>();
   for (const text of extraQuestions) {
     const key = headingKey(text);
-    if (key && !questionGroups.has(key)) {
-      questionGroups.set(key, { text, urls: new Set() });
-      questions.push({ text, pages: 0 });
-    }
+    if (key && !google.has(key) && google.size < MAX_GOOGLE_QUESTIONS) google.set(key, { text, pages: questionGroups.get(key)?.urls.size ?? 0, google: true });
   }
+  const questions: BriefQuestion[] = [
+    ...google.values(),
+    ...[...questionGroups]
+      .filter(([key]) => !google.has(key))
+      .map(([, g]) => ({ text: g.text, pages: g.urls.size, google: false }))
+      .sort((a, b) => b.pages - a.pages),
+  ].slice(0, MAX_QUESTIONS);
 
   const competitors: CompetitorPage[] = [
     ...read.map(({ page, counts }) => ({
       url: page.url,
       position: page.position ?? null,
+      order: page.order,
       ok: true,
       error: null,
       title: page.title,
@@ -220,10 +240,13 @@ export function buildBrief(keyword: string, pages: PageInput[], failed: FailedPa
         .map(([term, count]) => ({ term, count })),
       questions: page.headings.filter((h) => isQuestion(h.text)).map((h) => h.text),
     })),
-    ...failed.map((page) => ({ url: page.url, position: page.position ?? null, ok: false, error: page.error, title: null, wordCount: 0, headings: [], topTerms: [], questions: [] })),
-  ].sort((a, b) => (a.position ?? 1e9) - (b.position ?? 1e9));
+    ...failed.map((page) => ({ url: page.url, position: page.position ?? null, order: page.order, ok: false, error: page.error, title: null, wordCount: 0, headings: [], topTerms: [], questions: [] })),
+  ]
+    // Google order, or the order the pages were given in, failed ones in their place.
+    .sort((a, b) => (a.position ?? a.order ?? 1e9) - (b.position ?? b.order ?? 1e9))
+    .map(({ order: _order, ...page }) => page);
 
-  return { keyword, wordCount, headings, terms, questions: questions.slice(0, 30), competitors };
+  return { keyword, wordCount, headings, terms, questions, competitors };
 }
 
 // ── Draft analysis ──────────────────────────────────────────────────────────

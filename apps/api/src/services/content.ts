@@ -42,24 +42,21 @@ export async function processBrief(briefId: string, net: NetOptions = {}) {
     const failed: FailedPage[] = [];
     await mapLimit(row.urls, PAGE_CONCURRENCY, async (url, index) => {
       const position = row.source === "serp" ? index + 1 : null;
+      const order = index;
       try {
         const res = await fetcher.page(url);
         if (!res.html) {
-          failed.push({ url, position, error: res.error ?? `HTTP ${res.status}` });
+          failed.push({ url, position, order, error: res.error ?? `HTTP ${res.status}` });
         } else {
           const content = extractContent(res.html);
-          if (content.wordCount === 0) failed.push({ url, position, error: "No readable text; the page may need JavaScript to show it" });
-          else pages.push({ url, position, ...content });
+          if (content.wordCount === 0) failed.push({ url, position, order, error: "No readable text; the page may need JavaScript to show it" });
+          else pages.push({ url, position, order, ...content });
         }
       } catch (error) {
-        failed.push({ url, position, error: errorMessage(error) });
+        failed.push({ url, position, order, error: errorMessage(error) });
       }
       await dataDb.update(schema.contentBriefs).set({ heartbeatAt: new Date() }).where(eq(schema.contentBriefs.id, briefId));
     });
-    // Pasted pages keep the order they were pasted in.
-    const order = (url: string) => row.urls.indexOf(url);
-    pages.sort((a, b) => order(a.url) - order(b.url));
-    failed.sort((a, b) => order(a.url) - order(b.url));
     const brief = buildBrief(row.keyword, pages, failed, row.serpQuestions);
     await dataDb
       .update(schema.contentBriefs)
@@ -100,7 +97,12 @@ export function writerPrompt(keyword: string, brief: ContentBrief | null, mode: 
   if (brief?.wordCount) lines.push(`Length: ${brief.wordCount.min} to ${brief.wordCount.max} words (competitors' median is ${brief.wordCount.median}).`);
   if (brief?.headings.length) lines.push(`Subtopics competitors cover (pages using each):\n${brief.headings.slice(0, 20).map((h) => `- ${h.text} (${h.pages})`).join("\n")}`);
   if (brief?.terms.length) lines.push(`Terms to use naturally, with how often competitors use them:\n${brief.terms.map((t) => `- ${t.term}: ${t.min === t.max ? t.min : `${t.min}-${t.max}`}`).join("\n")}`);
-  if (brief?.questions.length) lines.push(`Questions to answer:\n${brief.questions.slice(0, 12).map((q) => `- ${q.text}`).join("\n")}`);
+  if (brief?.questions.length) {
+    // Every Google question (the brief keeps up to 10), then the most shared heading questions.
+    const asked = brief.questions.filter((q) => q.google);
+    const headed = brief.questions.filter((q) => !q.google).slice(0, Math.max(5, 16 - asked.length));
+    lines.push(`Questions to answer:\n${[...asked, ...headed].map((q) => `- ${q.text}`).join("\n")}`);
+  }
   lines.push(
     mode === "outline"
       ? "Write a detailed outline: one # title with the keyword, ## sections and ### subsections, each with one or two short bullet notes on what to cover."

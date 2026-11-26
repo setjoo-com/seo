@@ -21,6 +21,13 @@ describe("termCounts", () => {
     expect(counts.has("the")).toBe(false);
     expect(counts.has("boots warm")).toBe(false);
   });
+
+  it("never makes a phrase across lines, as between a heading and the next block", () => {
+    const counts = termCounts("How to choose\nFit matters\nGrip");
+    expect(counts.has("choose fit")).toBe(false);
+    expect(counts.has("matters grip")).toBe(false);
+    expect(counts.get("fit matters")).toBe(1);
+  });
 });
 
 describe("hasPhrase and isQuestion", () => {
@@ -64,9 +71,10 @@ describe("buildBrief", () => {
   it("groups shared headings and questions, and adds Google's questions once", () => {
     expect(brief.headings[0]).toEqual({ text: "1. Waterproofing", level: 2, pages: 3 });
     expect(brief.headings.some((h) => h.level === 1)).toBe(false);
+    // Google's questions come first; one that is also a heading keeps its page count.
     expect(brief.questions).toEqual([
-      { text: "How do I size boots?", pages: 2 },
-      { text: "Are winter boots worth it?", pages: 0 },
+      { text: "Are winter boots worth it?", pages: 0, google: true },
+      { text: "How do I size boots", pages: 2, google: true },
     ]);
   });
 
@@ -80,6 +88,25 @@ describe("buildBrief", () => {
     expect(brief.competitors[3]).toMatchObject({ error: "HTTP 404", wordCount: 0 });
     expect(brief.competitors[0]!.topTerms.length).toBeGreaterThan(0);
     expect(brief.competitors[0]!.questions).toEqual(["How do I size boots?"]);
+  });
+
+  it("keeps pasted pages in the order given, failed ones in their place", () => {
+    const ordered = buildBrief(
+      "boots",
+      [{ ...page("https://c.test", filler(200)), order: 2 }, { ...page("https://a.test", filler(200)), order: 0 }],
+      [{ url: "https://b.test", order: 1, error: "HTTP 500" }],
+    );
+    expect(ordered.competitors.map((c) => c.url)).toEqual(["https://a.test", "https://b.test", "https://c.test"]);
+    expect(ordered.competitors[0]).not.toHaveProperty("order");
+  });
+
+  it("keeps Google's questions when competitors have many question headings", () => {
+    const many = Array.from({ length: 40 }, (_, i) => ({ level: 2, text: `How does option ${i} work?` }));
+    const paa = Array.from({ length: 12 }, (_, i) => `Is choice ${i} good?`);
+    const result = buildBrief("boots", [page("https://a.test", filler(200), many), page("https://b.test", filler(200), many)], [], paa);
+    expect(result.questions).toHaveLength(30);
+    expect(result.questions.slice(0, 10).map((q) => q.text)).toEqual(paa.slice(0, 10));
+    expect(result.questions.slice(10).every((q) => !q.google && q.pages === 2)).toBe(true);
   });
 
   it("has no length when no page could be read", () => {

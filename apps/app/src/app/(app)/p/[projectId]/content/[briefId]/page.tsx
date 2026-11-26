@@ -73,7 +73,7 @@ function Outline({ brief }: { brief: ContentBrief }) {
               {brief.questions.map((question) => (
                 <li key={question.text} className="flex items-center justify-between gap-3 px-4 py-1.5 text-[13px]">
                   <span>{question.text}</span>
-                  <span className="shrink-0 font-mono text-xs text-muted">{question.pages === 0 ? "Google" : `${question.pages} ${question.pages === 1 ? "page" : "pages"}`}</span>
+                  <span className="shrink-0 font-mono text-xs text-muted">{[question.google && "Google", question.pages > 0 && `${question.pages} ${question.pages === 1 ? "page" : "pages"}`].filter(Boolean).join(" · ")}</span>
                 </li>
               ))}
             </ul>

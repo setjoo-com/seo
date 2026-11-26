@@ -13,7 +13,7 @@ let base = "";
 
 const article = (title: string, sections: string[], words: number) =>
   `<!doctype html><html><head><title>${title}</title></head><body><nav><a href="/">Home</a> Shop Blog</nav><main><h1>${title}</h1>` +
-  `<p>Winter boots need waterproof leather and good grip on ice. ${Array.from({ length: words }, (_, i) => `filler${i}`).join(" ")}</p>` +
+  `<p>Winter boots need waterproof leather and good grip on ice. ${Array.from({ length: words }, (_, i) => `${title[0]}filler${i}`).join(" ")}</p>` +
   sections.map((s) => `<h2>${s}</h2><p>Insulation and waterproof leather matter for winter boots.</p>`).join("") +
   `</main><footer>Copyright</footer></body></html>`;
 
@@ -66,7 +66,7 @@ describe("content briefs from pasted URLs", () => {
   beforeAll(async () => {
     user = await readyUser();
     harness.enqueued.length = 0;
-    const urls = [`${base}/a`, `${base}/b`, `${base}/c`, `${base}/missing`, `${base}/data.json`];
+    const urls = [`${base}/a`, `${base}/missing`, `${base}/b`, `${base}/data.json`, `${base}/c`];
     const before = harness.fake.requests.length;
     const created = await user.api.post(`/projects/${user.project.id}/content/briefs`, { source: "urls", keyword: "Winter Boots", urls });
     expect(created.status).toBe(202);
@@ -81,24 +81,28 @@ describe("content briefs from pasted URLs", () => {
     const brief = await user.api.ok("GET", `/projects/${user.project.id}/content/briefs/${briefId}`);
     expect(brief).toMatchObject({ status: "completed", error: null, drafts: [] });
     const { competitors, wordCount, headings, terms, questions } = brief.brief;
+    // In the order pasted, failed pages in their place.
     expect(competitors.map((c: { url: string; ok: boolean }) => [c.url.replace(base, ""), c.ok])).toEqual([
       ["/a", true],
-      ["/b", true],
-      ["/c", true],
       ["/missing", false],
+      ["/b", true],
       ["/data.json", false],
+      ["/c", true],
     ]);
-    expect(competitors[3].error).toBe("HTTP 404");
-    expect(competitors[4].error).toMatch(/^Not an HTML page/);
+    expect(competitors[1].error).toBe("HTTP 404");
+    expect(competitors[3].error).toMatch(/^Not an HTML page/);
     // The navigation and footer are not content.
     expect(competitors[0].wordCount).toBeGreaterThan(400);
     expect(competitors[0].wordCount).toBeLessThan(440);
     expect(competitors[0].headings[0]).toEqual({ level: 1, text: "Best winter boots" });
-    expect(wordCount.median).toBe(competitors[1].wordCount);
+    expect(wordCount.median).toBe(competitors[2].wordCount);
     expect(headings[0]).toMatchObject({ text: "Waterproofing", pages: 3 });
     expect(terms.find((t: { term: string }) => t.term === "waterproof leather")).toMatchObject({ pages: 3 });
     expect(terms.some((t: { term: string }) => t.term === "home" || t.term === "copyright")).toBe(false);
-    expect(questions).toEqual([{ text: "How to choose winter boots?", pages: 2 }]);
+    expect(questions).toEqual([{ text: "How to choose winter boots?", pages: 2, google: false }]);
+    // Each h2 is followed by a paragraph starting "Insulation": no phrase runs across the two blocks.
+    expect(terms.some((t: { term: string }) => t.term === "waterproofing insulation")).toBe(false);
+    expect(terms.find((t: { term: string }) => t.term === "waterproofing")).toMatchObject({ pages: 3 });
 
     const list = await user.api.ok("GET", `/projects/${user.project.id}/content/briefs`);
     expect(list).toEqual([expect.objectContaining({ id: briefId, status: "completed", pages: 5, drafts: 0, bestScore: null, wordCount })]);
