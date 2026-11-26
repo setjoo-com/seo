@@ -23,9 +23,22 @@ export interface SiteFile {
   error: string | null;
 }
 
+export interface SitePage {
+  /** Final status; 0 when no response came back. */
+  status: number;
+  finalUrl: string;
+  /** The HTML, capped at 2 MB like a crawled page; null without a 2xx HTML response. */
+  html: string | null;
+  error: string | null;
+}
+
+const HTML_TYPE = /text\/html|application\/xhtml\+xml/i;
+
 export interface SiteFetcher {
   /** One small file, such as an IndexNow key file or a homepage, with the crawler's SSRF protection. */
   file(url: string): Promise<SiteFile>;
+  /** One HTML page, such as a competitor's article. Anything that is not HTML counts as an error. */
+  page(url: string): Promise<SitePage>;
   /** Every sitemap the site lists in robots.txt, plus /sitemap.xml and /sitemap_index.xml, followed through indexes. */
   sitemaps(origin: string, limits?: SitemapLimits): Promise<SitemapDiscovery & { robotsSitemaps: string[] }>;
   close(): void;
@@ -59,6 +72,20 @@ export function createSiteFetcher(options: SiteFetcherOptions = {}): SiteFetcher
         finalUrl: res.finalUrl,
         text: ok && res.body ? decodeBody(res.body, res.headers?.get('content-type') ?? null) : null,
         error: res.error?.message ?? null,
+      };
+    },
+    async page(url) {
+      const res = await fetchUrl(ctx, url, { maxBodyBytes: 2 * 1024 * 1024, wantBody: (contentType) => HTML_TYPE.test(contentType) });
+      const status = res.error ? 0 : res.status;
+      const type = res.headers?.get('content-type') ?? '';
+      let error = res.error?.message ?? null;
+      if (!error && (status < 200 || status >= 300)) error = `HTTP ${status}`;
+      else if (!error && !HTML_TYPE.test(type)) error = `Not an HTML page (${type || 'no content type'})`;
+      return {
+        status,
+        finalUrl: res.finalUrl,
+        html: !error && res.body ? decodeBody(res.body, type) : null,
+        error,
       };
     },
     async sitemaps(origin, limits = DEFAULT_SITEMAP_LIMITS) {

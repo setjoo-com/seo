@@ -5,7 +5,7 @@ import { DEFAULT_THRESHOLDS, crossPageIssues, hasNoindex, makeIssue, markIndexab
 import { ISSUE_CATALOG } from './catalog';
 import type { IssueType } from './catalog';
 import { crawlSite } from './crawl';
-import { extractPage } from './extract';
+import { extractContent, extractPage } from './extract';
 import { HostThrottle } from './fetch';
 import type { FetchContext } from './fetch';
 import { DEFAULT_SITEMAP_LIMITS, discoverSitemapUrls } from './robots';
@@ -1089,5 +1089,23 @@ describe('extractPage', () => {
     expect(data.structuredData).toEqual([{ types: ['WebSite'], problems: ['Item without "@type"'] }]);
     expect(data.hasMicrodata).toBe(true);
     expect(data.metaDescription).toBeNull();
+  });
+});
+
+describe('extractContent', () => {
+  it('reads the main content without the site chrome', () => {
+    const data = extractContent(
+      `<html><head><title>Best boots</title></head><body><header><h1>Best boots for winter</h1><nav><a href="/">Home</a> <a href="/shop">Shop</a></nav></header>
+<main><p>Warm boots keep you dry.</p><h2>How to choose</h2><ul><li>Fit</li><li>Grip</li></ul><h3>What size?</h3><h4>Ignored level</h4>
+<form><label>Email</label></form><script>var x = "not counted";</script></main><footer>Copyright words here</footer></body></html>`,
+    );
+    expect(data.title).toBe('Best boots');
+    expect(data.headings).toEqual([
+      { level: 1, text: 'Best boots for winter' },
+      { level: 2, text: 'How to choose' },
+      { level: 3, text: 'What size?' },
+    ]);
+    expect(data.text).toBe('Warm boots keep you dry. How to choose Fit Grip What size? Ignored level');
+    expect(data.wordCount).toBe(14);
   });
 });
