@@ -52,6 +52,11 @@ const writerInput = z.object({
 // A ceiling that does not parse must be refused, not read as "no ceiling".
 const costQuery = z.object({ dryRun: z.string().optional().transform((v) => v === "1"), maxCostUsd: z.coerce.number().positive().finite().optional() });
 
+const spentNote = (costUsd: number) =>
+  costUsd > 0
+    ? `The Google search cost $${costUsd.toFixed(2)}; it is recorded on a failed brief, and the same search within the hour is free.`
+    : "Nothing was spent.";
+
 type P = { Params: { projectId: string }; Querystring: Record<string, string | undefined> };
 type BriefParams = { Params: { projectId: string; briefId: string }; Querystring: Record<string, string | undefined> };
 type DraftParams = { Params: { projectId: string; draftId: string } };
@@ -147,14 +152,23 @@ export async function contentRoutes(app: FastifyInstance) {
       const organic = results.filter((r) => r?.type === "organic" && typeof r.url === "string" && r.url).map((r) => r.url as string);
       urls = [...new Set(organic)].slice(0, BRIEF_MAX_URLS);
       serpQuestions = peopleAlsoAsk(results);
-      if (!urls.length) throw new AppError(404, "no_results", `Google shows no organic results for "${input.keyword}" in ${project.locationName}`);
     }
 
-    const [brief] = await dataDb
-      .insert(schema.contentBriefs)
-      .values({ projectId: project.id, keyword: input.keyword, source: input.source, urls, serpQuestions, costUsd })
-      .returning();
-    await dispatch("content.brief", { briefId: brief!.id }, (message) => failBrief(brief!.id, message));
+    // Once the search is paid, every outcome is saved as a brief, so its cost stays on record.
+    const values = { projectId: project.id, keyword: input.keyword, source: input.source, urls, serpQuestions, costUsd };
+    if (!urls.length) {
+      const error = `Google shows no organic results for "${input.keyword}" in ${project.locationName}`;
+      await dataDb.insert(schema.contentBriefs).values({ ...values, status: "failed", error, finishedAt: new Date() });
+      throw new AppError(404, "no_results", `${error}. ${spentNote(costUsd)}`);
+    }
+    const [brief] = await dataDb.insert(schema.contentBriefs).values(values).returning();
+    try {
+      await dispatch("content.brief", { briefId: brief!.id }, (message) => failBrief(brief!.id, message));
+    } catch (error) {
+      // dispatch says nothing was spent, which is not so once the search was paid.
+      if (costUsd > 0 && error instanceof AppError) throw new AppError(error.status, error.code, `The background queue is unavailable. ${spentNote(costUsd)}`);
+      throw error;
+    }
     return reply.status(202).send({ ok: true, data: { ...brief, estimate } });
   });
 

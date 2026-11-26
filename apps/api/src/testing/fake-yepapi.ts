@@ -33,6 +33,9 @@ function keyword(text: string) {
 const sites = ["wikipedia.org", "example.com", "acme.com", "globex.io", "initech.com", "hooli.com", "umbrella.co", "stark.dev", "wayne.org", "soylent.app"];
 
 function serp(body: any) {
+  if (String(body.query).includes("no organic results")) {
+    return { query: body.query, totalResults: 0, itemTypes: ["peopleAlsoAsk"], results: [{ position: 1, type: "peopleAlsoAsk", title: "People also ask", url: "", description: "", domain: "", data: { items: [{ title: "Why are there no results?" }] } }] };
+  }
   const depth = Math.min(100, body.depth ?? 10);
   const h = hash(`${body.query}|${body.device ?? "desktop"}`);
   const target: string | undefined = body.stop_at_domain;

@@ -230,12 +230,39 @@ describe("content briefs from Google's top 10", () => {
     expect(again).toMatchObject({ costUsd: 0, urls: created.urls });
   });
 
+  it("records a paid search that finds nothing, and says what it cost", async () => {
+    const user = await readyUser();
+    const res = await user.api.post(`/projects/${user.project.id}/content/briefs`, { source: "serp", keyword: "no organic results here" });
+    expect(res.status).toBe(404);
+    expect(res.body.error?.code).toBe("no_results");
+    expect(res.body.error?.message).toContain("The Google search cost $0.01");
+    const [brief] = await user.api.ok("GET", `/projects/${user.project.id}/content/briefs`);
+    expect(brief).toMatchObject({ status: "failed", costUsd: 0.01, pages: 0 });
+  });
+
+  it("says what a paid search cost when the queue is down", async () => {
+    const user = await readyUser();
+    harness.queueDown = true;
+    try {
+      const res = await user.api.post(`/projects/${user.project.id}/content/briefs`, { source: "serp", keyword: "queue down boots" });
+      expect(res.status).toBe(503);
+      expect(res.body.error?.message).toMatch(/^The background queue is unavailable\. The Google search cost \$0\.01/);
+      expect(res.body.error?.message).not.toContain("Nothing was spent");
+    } finally {
+      harness.queueDown = false;
+    }
+    const [brief] = await user.api.ok("GET", `/projects/${user.project.id}/content/briefs`);
+    expect(brief).toMatchObject({ status: "failed", costUsd: 0.01 });
+  });
+
   it("fails the brief straight away when the queue is down", async () => {
     const user = await readyUser();
     harness.queueDown = true;
     try {
       const res = await user.api.post(`/projects/${user.project.id}/content/briefs`, { source: "urls", keyword: "boots", urls: [`${base}/a`] });
       expect(res.status).toBe(503);
+      // Pasted URLs cost nothing, so the queue's own message is true.
+      expect(res.body.error?.message).toContain("Nothing was spent");
     } finally {
       harness.queueDown = false;
     }
