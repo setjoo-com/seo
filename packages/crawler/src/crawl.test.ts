@@ -6,6 +6,7 @@ import { ISSUE_CATALOG } from './catalog';
 import type { IssueType } from './catalog';
 import { crawlSite } from './crawl';
 import { extractContent, extractPage } from './extract';
+import { createSiteFetcher } from './site';
 import { HostThrottle } from './fetch';
 import type { FetchContext } from './fetch';
 import { DEFAULT_SITEMAP_LIMITS, discoverSitemapUrls } from './robots';
@@ -1105,7 +1106,44 @@ describe('extractContent', () => {
       { level: 2, text: 'How to choose' },
       { level: 3, text: 'What size?' },
     ]);
-    expect(data.text).toBe('Warm boots keep you dry. How to choose Fit Grip What size? Ignored level');
+    // One line per block, so a phrase cannot run from a heading into a list item.
+    expect(data.text).toBe('Warm boots keep you dry.\nHow to choose\nFit\nGrip\nWhat size?\nIgnored level');
     expect(data.wordCount).toBe(14);
+  });
+
+  it('keeps a form that holds the page, as ASP.NET WebForms pages do, and drops a small one', () => {
+    const words = Array.from({ length: 50 }, (_, i) => `word${i}`).join(' ');
+    const webForms = extractContent(`<html><body><form id="aspnetForm"><nav>Menu</nav><h2>Boots</h2><p>${words}</p></form></body></html>`);
+    expect(webForms.wordCount).toBe(51);
+    const signUp = extractContent(`<html><body><h2>Boots</h2><p>${words}</p><form><p>Join our newsletter today</p></form></body></html>`);
+    expect(signUp.wordCount).toBe(51);
+  });
+});
+
+describe('SiteFetcher.page', () => {
+  const fetcherFor = (status: number, html: string, type = 'text/html') =>
+    createSiteFetcher({
+      resolveHost: async () => ['93.184.216.34'],
+      fetch: async () => new Response(html, { status, headers: { 'content-type': type } }),
+    });
+
+  it('returns the HTML of a normal page', async () => {
+    const page = await fetcherFor(200, '<html><title>Boots</title><body>Hi</body></html>').page('https://example.com/boots');
+    expect(page).toMatchObject({ status: 200, error: null });
+    expect(page.html).toContain('Boots');
+  });
+
+  it('reports a bot check as blocked, whether it answers 200 or 503', async () => {
+    const challenge = '<html><head><title>Just a moment...</title></head><body><div id="cf-chl-widget">Verifying you are human</div></body></html>';
+    for (const status of [200, 503]) {
+      const page = await fetcherFor(status, challenge).page('https://example.com/boots');
+      expect(page).toMatchObject({ html: null, error: `Blocked by the site's bot protection (HTTP ${status})` });
+    }
+    expect((await fetcherFor(403, '<html>denied</html>').page('https://example.com/')).error).toBe("Blocked by the site's bot protection (HTTP 403)");
+  });
+
+  it('refuses what is not HTML, and error statuses', async () => {
+    expect((await fetcherFor(200, '{}', 'application/json').page('https://example.com/a')).error).toBe('Not an HTML page (application/json)');
+    expect((await fetcherFor(404, '<html>gone</html>').page('https://example.com/a')).error).toBe('HTTP 404');
   });
 });

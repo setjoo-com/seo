@@ -1,5 +1,5 @@
 import { DEFAULT_USER_AGENT } from './crawl';
-import { createPinnedTransport, decodeBody, fetchUrl, HostThrottle } from './fetch';
+import { classifyResponse, createPinnedTransport, decodeBody, fetchUrl, HostThrottle } from './fetch';
 import type { FetchContext } from './fetch';
 import type { FetchLike } from './types';
 import { DEFAULT_SITEMAP_LIMITS, discoverSitemapUrls, loadRobots } from './robots';
@@ -78,15 +78,17 @@ export function createSiteFetcher(options: SiteFetcherOptions = {}): SiteFetcher
       const res = await fetchUrl(ctx, url, { maxBodyBytes: 2 * 1024 * 1024, wantBody: (contentType) => HTML_TYPE.test(contentType) });
       const status = res.error ? 0 : res.status;
       const type = res.headers?.get('content-type') ?? '';
+      const body = res.body ? decodeBody(res.body, type) : null;
       let error = res.error?.message ?? null;
-      if (!error && (status < 200 || status >= 300)) error = `HTTP ${status}`;
-      else if (!error && !HTML_TYPE.test(type)) error = `Not an HTML page (${type || 'no content type'})`;
-      return {
-        status,
-        finalUrl: res.finalUrl,
-        html: !error && res.body ? decodeBody(res.body, type) : null,
-        error,
-      };
+      if (!error) {
+        // A bot check ("Just a moment…") answers 200 or 503 with a page that is not the content.
+        const kind = classifyResponse(status, res.headers, body);
+        if (kind === 'blocked') error = `Blocked by the site's bot protection (HTTP ${status})`;
+        else if (kind === 'rate_limited') error = 'Rate limited by the site (HTTP 429)';
+        else if (status < 200 || status >= 300) error = `HTTP ${status}`;
+        else if (!HTML_TYPE.test(type)) error = `Not an HTML page (${type || 'no content type'})`;
+      }
+      return { status, finalUrl: res.finalUrl, html: error ? null : body, error };
     },
     async sitemaps(origin, limits = DEFAULT_SITEMAP_LIMITS) {
       const robots = await loadRobots(origin, ctx, userAgent);

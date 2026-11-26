@@ -377,13 +377,16 @@ export interface PageContent {
   title: string | null;
   /** h1 to h3, in document order. */
   headings: Heading[];
-  /** Visible text of the main content, whitespace collapsed. */
+  /** Visible text of the main content: one line per block (paragraph, heading, list item, cell). */
   text: string;
   wordCount: number;
 }
 
 // Site chrome, left out so a competitor's menu and footer do not count as its content.
-const CHROME = 'nav, header, footer, aside, form, [role="navigation"], [role="banner"], [role="contentinfo"], [aria-hidden="true"]';
+const CHROME = 'nav, header, footer, aside, [role="navigation"], [role="banner"], [role="contentinfo"], [aria-hidden="true"]';
+const BLOCKS = 'p, li, h1, h2, h3, h4, h5, h6, td, th, tr, div, section, article, br, blockquote, pre, figcaption, dd, dt';
+// Marks a block boundary through the whitespace collapsing; becomes a newline in the text.
+const BREAK = '\uE000';
 
 /**
  * The content of one page as a reader sees it, for content briefs: the main article when the page
@@ -394,6 +397,13 @@ export function extractContent(html: string): PageContent {
   const titleEl = $('title').filter((_, el) => $(el).closest('svg').length === 0).first();
   const title = titleEl.length > 0 ? collapse(titleEl.text()) || null : null;
   const firstH1 = collapse($('h1').first().text()).slice(0, 300);
+  // A form is chrome (search box, sign-up) unless it holds the content: ASP.NET WebForms pages
+  // wrap the whole body in one form.
+  const bodyLength = collapse($('body').text()).length;
+  $('form').each((_, el) => {
+    const form = $(el);
+    if (form.find('main, article').length === 0 && collapse(form.text()).length < bodyLength / 2) form.remove();
+  });
   $(CHROME).remove();
   const main = [$('main').first(), $('article').first()].find((el) => el.length > 0) ?? $('body').first();
 
@@ -405,10 +415,15 @@ export function extractContent(html: string): PageContent {
   // An h1 in a header left out as chrome is still the page's h1.
   if (firstH1 && !headings.some((h) => h.level === 1)) headings.unshift({ level: 1, text: firstH1 });
 
-  // Block elements end a sentence or phrase; without a break their texts would run together.
-  main.find('p, li, h1, h2, h3, h4, h5, h6, td, th, div, br, blockquote, dd, dt').after(' ');
+  // One line per block, as a Markdown draft has: two-word phrases then never run from a heading
+  // or list item into the next block, on competitor pages as in drafts.
+  main.find(BLOCKS).before(BREAK).after(BREAK);
   const parts: string[] = [];
   visibleText(main.get(0) as unknown as DomNode | undefined, parts);
-  const text = collapse(parts.join(' '));
+  const text = parts
+    .join(' ')
+    .replace(/\s+/g, ' ')
+    .replace(/\s*\uE000[\s\uE000]*/g, '\n')
+    .trim();
   return { title, headings, text, wordCount: countWords(text) };
 }
