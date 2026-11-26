@@ -39,7 +39,10 @@ const briefInput = z.discriminatedUnion("source", [
   z.object({ source: z.literal("serp"), keyword: zKeyword() }),
 ]);
 
-const draftInput = z.object({ title: z.string().max(300).default(""), body: z.string().max(200_000).default("") });
+const draftFields = { title: z.string().max(300), body: z.string().max(200_000) };
+const draftInput = z.object({ title: draftFields.title.default(""), body: draftFields.body.default("") });
+// An update changes only the fields it sends.
+const draftUpdate = z.object({ title: draftFields.title.optional(), body: draftFields.body.optional() });
 
 const writerInput = z.object({
   mode: z.enum(["draft", "outline"]).default("draft"),
@@ -241,11 +244,12 @@ export async function contentRoutes(app: FastifyInstance) {
     const project = await requireProject(user.id, request.params.projectId);
     const draft = await requireDraft(project.id, request.params.draftId);
     const brief = await requireBrief(project.id, draft.briefId);
-    const input = parse(draftInput, request.body ?? {});
-    const score = scoreDraft(brief, input);
+    const input = parse(draftUpdate, request.body ?? {});
+    const merged = { title: input.title ?? draft.title, body: input.body ?? draft.body };
+    const score = scoreDraft(brief, merged);
     const [updated] = await dataDb
       .update(schema.contentDrafts)
-      .set({ ...input, score: score.score, wordCount: score.wordCount })
+      .set({ ...merged, score: score.score, wordCount: score.wordCount })
       .where(eq(schema.contentDrafts.id, draft.id))
       .returning();
     return { ok: true, data: { ...updated, scoreDetail: score } };

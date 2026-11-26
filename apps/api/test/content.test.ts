@@ -137,6 +137,14 @@ describe("content briefs from pasted URLs", () => {
     expect(saved.score).toBe(saved.scoreDetail.score);
     expect(saved.wordCount).toBe(saved.scoreDetail.wordCount);
 
+    // A title-only update keeps the text, and the score follows the merged draft.
+    const retitled = await user.api.ok("PUT", `/projects/${user.project.id}/content/drafts/${created.id}`, { title: "Boots" });
+    expect(retitled).toMatchObject({ title: "Boots", body, wordCount: saved.wordCount });
+    expect(retitled.score).toBeLessThan(saved.score);
+    const bodyOnly = await user.api.ok("PUT", `/projects/${user.project.id}/content/drafts/${created.id}`, { body: "Short." });
+    expect(bodyOnly).toMatchObject({ title: "Boots", body: "Short." });
+    await user.api.ok("PUT", `/projects/${user.project.id}/content/drafts/${created.id}`, { title: "Winter boots buying guide", body });
+
     const opened = await user.api.ok("GET", `/projects/${user.project.id}/content/drafts/${created.id}`);
     expect(opened).toMatchObject({ title: "Winter boots buying guide", body, score: saved.score, brief: { id: briefId, keyword: "winter boots" } });
     const list = await user.api.ok("GET", `/projects/${user.project.id}/content/briefs`);
