@@ -58,7 +58,7 @@ const writerInput = z.object({
 });
 
 // A ceiling that does not parse must be refused, not read as "no ceiling".
-const costQuery = z.object({ dryRun: z.literal("1").optional(), maxCostUsd: z.coerce.number().positive().finite().optional() });
+const costQuery = z.object({ dryRun: z.string().optional().transform((v) => v === "1"), maxCostUsd: z.coerce.number().positive().finite().optional() });
 
 type SerpData = { results: { type: string; url?: string; data?: { items?: { title?: string }[] } | null }[] };
 type P = { Params: { projectId: string }; Querystring: Record<string, string | undefined> };
@@ -146,7 +146,7 @@ export async function contentRoutes(app: FastifyInstance) {
       if (query.dryRun) return { ok: true, data: { estimate, dryRun: true } };
       urls = [...new Set(input.urls)];
     } else {
-      const lookup = await runLookup(user.id, project, "serp", { query: input.keyword, depth: 10 }, { dryRun: Boolean(query.dryRun), maxCostUsd: query.maxCostUsd });
+      const lookup = await runLookup(user.id, project, "serp", { query: input.keyword, depth: 10 }, { dryRun: query.dryRun, maxCostUsd: query.maxCostUsd });
       if ("dryRun" in lookup) return { ok: true, data: { estimate: lookup.estimate, dryRun: true } };
       estimate = lookup.estimate;
       costUsd = lookup.costUsd;

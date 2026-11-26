@@ -22,7 +22,7 @@ export type CompetitorPage = {
   questions: string[];
 };
 
-/** What the API read from one page: its outline and text. */
+/** What the API read from one page: its outline, and its text with the headings in it. */
 export type PageInput = {
   url: string;
   position?: number | null;
@@ -140,7 +140,8 @@ const MAX_PHRASES = 15;
  * their error and otherwise left out. `extraQuestions` are Google's People Also Ask questions.
  */
 export function buildBrief(keyword: string, pages: PageInput[], failed: FailedPage[] = [], extraQuestions: string[] = []): ContentBrief {
-  const read = pages.map((page) => ({ page, counts: termCounts([page.title ?? "", ...page.headings.map((h) => h.text), page.text].join("\n")) }));
+  // The text already holds the headings, as a draft's text does; the title is counted for both.
+  const read = pages.map((page) => ({ page, counts: termCounts([page.title ?? "", page.text].join("\n")) }));
 
   const lengths = pages.map((p) => p.wordCount).filter((n) => n >= THIN_PAGE);
   const sortedLengths = (lengths.length ? lengths : pages.map((p) => p.wordCount).filter((n) => n > 0)).sort((a, b) => a - b);
