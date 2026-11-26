@@ -82,6 +82,9 @@ export function scoreDraft(brief: Pick<Brief, "keyword" | "brief">, draft: { tit
 
 export const WRITER_MODELS = CURATED_MODELS.map((m) => m.id);
 
+/** How long one writer call may take. Keep it under the app's proxyTimeout and any proxy in front. */
+export const WRITER_TIMEOUT_MS = 150_000;
+
 /** Output tokens allowed: enough for the top of the brief's length range, about 1.4 tokens a word. */
 function maxTokensFor(brief: ContentBrief | null, mode: WriterMode): number {
   if (mode === "outline") return 1500;
@@ -134,8 +137,12 @@ export function estimateWriter(keyword: string, brief: ContentBrief | null, mode
 /** Writes a draft or an outline from the brief with one chat call, and saves it as a new draft. */
 export async function writeDraft(userId: string, brief: Brief, mode: WriterMode, model: string) {
   const yep = await getYep({ userId, projectId: brief.projectId, feature: "content_writer" });
-  const res = await withUpstreamRetry(() =>
-    yep.ai.chat({ model, messages: writerPrompt(brief.keyword, brief.brief, mode), maxTokens: maxTokensFor(brief.brief, mode), temperature: 0.6 }),
+  // A long draft can take minutes to generate, and the request waits for it: one attempt, with a
+  // timeout under the app's /api proxy timeout (apps/app/next.config.ts). An upstream timeout is not
+  // billed, so the user can simply try again.
+  const res = await withUpstreamRetry(
+    () => yep.ai.chat({ model, messages: writerPrompt(brief.keyword, brief.brief, mode), maxTokens: maxTokensFor(brief.brief, mode), temperature: 0.6 }, { timeoutMs: WRITER_TIMEOUT_MS }),
+    0,
   );
   const content = typeof res.data.message.content === "string" ? res.data.message.content : "";
   const body = content.replace(/^\s*```(?:markdown|md)?\s*\n([\s\S]*?)\n```\s*$/, "$1").trim();

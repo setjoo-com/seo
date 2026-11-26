@@ -8,6 +8,12 @@ const config: NextConfig = {
   transpilePackages: ["@openseo/shared"],
   // PostHog's API paths end in a slash.
   skipTrailingSlashRedirect: true,
+  experimental: {
+    // The /api rewrite gives up after 30 s by default. The AI writer answers in one request and a
+    // full draft can take minutes (API: WRITER_TIMEOUT_MS, 150 s), so allow 3 minutes. A proxy in
+    // front of the app needs a read timeout at least as long.
+    proxyTimeout: 180_000,
+  },
   // The browser only ever talks to this origin; /api is forwarded to the API server.
   // No framing: the consent page approves connections with one click.
   async headers() {

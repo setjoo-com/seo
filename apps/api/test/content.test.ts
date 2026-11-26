@@ -1,9 +1,10 @@
+import { readFileSync } from "node:fs";
 import http from "node:http";
 import type { AddressInfo } from "node:net";
 import { eq } from "drizzle-orm";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { db, schema } from "../src/db";
-import { processBrief } from "../src/services/content";
+import { processBrief, WRITER_TIMEOUT_MS } from "../src/services/content";
 import { readyUser, signUp } from "./client";
 import { harness } from "./harness";
 
@@ -185,6 +186,13 @@ describe("content briefs from pasted URLs", () => {
     expect(calls[0]!.body.messages[1].content).toContain("waterproof leather");
     const rows = await usageRows(user.userId, "content_writer");
     expect(rows).toEqual([expect.objectContaining({ endpoint: "/v1/ai/chat", costUsd: 0.034, projectId: user.project.id, ok: true })]);
+  });
+
+  it("gives the writer less time than the app's /api proxy waits", () => {
+    const config = readFileSync(new URL("../../app/next.config.ts", import.meta.url), "utf8");
+    const proxyTimeout = Number(/proxyTimeout:\s*([\d_]+)/.exec(config)?.[1]?.replaceAll("_", ""));
+    expect(WRITER_TIMEOUT_MS).toBeGreaterThan(60_000);
+    expect(proxyTimeout).toBeGreaterThan(WRITER_TIMEOUT_MS);
   });
 
   it("deletes a brief with its drafts", async () => {
